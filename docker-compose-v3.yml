@@ -1,0 +1,174 @@
+version: '3.7'
+
+services:
+  spark-master:
+    image: 127.0.0.1:5000/spark-master
+    build:
+      context: ./spark
+    networks:
+      - hbase
+    environment:
+      - "SPARK_LOCAL_IP=0.0.0.0"
+      - "SPARK_MASTER_PORT=7077"
+      - "SPARK_MASTER_WEBUI_PORT=8080"
+      - "SPARK_WORKER_CORES=2"
+    deploy:
+      mode: replicated
+      replicas: 1 
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname == swarm-host1     
+    command: "/start-master.sh"
+
+  spark-worker:
+    image: 127.0.0.1:5000/spark-worker
+    build:
+      context: ./spark
+    depends_on:
+      - spark-master
+    networks:
+      - hbase
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+      - "SPARK_WORKER_WEBUI_PORT=8080"
+      - "SPARK_WORKER_CORES=2"
+    deploy:
+      mode: global
+      endpoint_mode: dnsrr 
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname != swarm-mgr
+    command:
+      - "/start-worker.sh"
+
+  jupyter-lab:
+    image: 127.0.0.1:5000/jupyter-lab
+    build:
+      context: ./jupyter
+    depends_on:
+      - spark-master
+    volumes:
+      - jupyter_data:/home/jovyan/work:rw
+    networks:
+      - hbase
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname == swarm-host2
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - PYSPARK_PYTHON=/usr/local/bin/python
+      - PYSPARK_DRIVER_PYTHON=/opt/conda/bin/python
+
+  namenode:
+    image: 127.0.0.1:5000/namenode
+    networks:
+      - hbase
+    volumes:
+      - namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname == swarm-mgr 
+
+  datanode:
+    image: 127.0.0.1:5000/datanode
+    networks:
+      - hbase
+    volumes:
+      - datanode:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    deploy:
+      mode: global
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname != swarm-mgr
+
+  resourcemanager:
+    image: 127.0.0.1:5000/resourcemanager 
+    networks:
+      - hbase
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864"
+    env_file:
+      - ./hadoop.env
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname != swarm-mgr
+
+  nodemanager:
+    image: 127.0.0.1:5000/nodemanager
+    networks:
+      - hbase
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop.env
+    deploy:
+      mode: global
+      endpoint_mode: dnsrr 
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname != swarm-mgr
+
+  historyserver:
+    image: 127.0.0.1:5000/historyserver
+    networks:
+      - hbase
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop.env
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints:
+          - node.hostname != swarm-mgr
+
+volumes:
+  datanode:
+  namenode:
+  hadoop_historyserver:
+  jupyter_data:
+
+networks:
+  hbase:
+    external:
+      name: hbase
