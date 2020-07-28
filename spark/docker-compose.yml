@@ -1,0 +1,76 @@
+version: '3.7'
+
+services:
+  spark-master:
+    image: 127.0.0.1:5000/spark-master
+    build:
+      context: ./spark
+      - 7077:7077
+    networks:
+      - spark-network
+    environment:
+      - "SPARK_LOCAL_IP=0.0.0.0"
+      - "SPARK_MASTER_PORT=7077"
+      - "SPARK_MASTER_WEBUI_PORT=8080"
+      - "SPARK_WORKER_CORES=1"
+    deploy:
+      mode: replicated
+      replicas: 1 
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+    command: "/start-master.sh"
+
+  spark-worker:
+    image: 127.0.0.1:5000/spark-worker
+    build:
+      context: ./spark
+    depends_on:
+      - spark-master
+    networks:
+      - spark-network
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+      - "SPARK_WORKER_WEBUI_PORT=8080"
+    deploy:
+      mode: replicated
+      replicas: 4
+      endpoint_mode: dnsrr 
+      restart_policy:
+        condition: on-failure
+    command:
+      - "/start-worker.sh"
+
+  jupyter-lab:
+    image: 127.0.0.1:5000/jupyter-lab
+    build:
+      context: ./jupyter
+    depends_on:
+      - spark-master
+    volumes:
+      - jupyter_data:/home/jovyan/work:rw
+      - 8888:8888
+    networks:
+      - spark-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: dnsrr
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.hostname == swarm-host2
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - PYSPARK_PYTHON=/usr/bin/python3
+      - PYSPARK_DRIVER_PYTHON=/opt/conda/bin/python
+
+  
+volumes:
+  jupyter_data:
+
+networks:
+  spark-network:
+    external:
+      name: spark-network
