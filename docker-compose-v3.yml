@@ -3,8 +3,6 @@ version: '3.7'
 services:
   spark-master:
     image: 127.0.0.1:5000/spark-master
-    build:
-      context: ./spark
     networks:
       - hbase
     environment:
@@ -25,8 +23,6 @@ services:
 
   spark-worker:
     image: 127.0.0.1:5000/spark-worker
-    build:
-      context: ./spark
     depends_on:
       - spark-master
     networks:
@@ -48,8 +44,6 @@ services:
 
   jupyter-lab:
     image: 127.0.0.1:5000/jupyter-lab
-    build:
-      context: ./jupyter
     depends_on:
       - spark-master
     volumes:
@@ -170,5 +164,4 @@ volumes:
 
 networks:
   hbase:
-    external:
-      name: hbase
+    name: hbase

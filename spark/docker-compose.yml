@@ -5,7 +5,6 @@ services:
     image: 127.0.0.1:5000/spark-master
     build:
       context: ./spark
-      - 7077:7077
     networks:
       - spark-network
     environment:
@@ -49,7 +48,6 @@ services:
       - spark-master
     volumes:
       - jupyter_data:/home/jovyan/work:rw
-      - 8888:8888
     networks:
       - spark-network
     deploy:

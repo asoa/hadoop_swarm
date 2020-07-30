@@ -1,14 +1,16 @@
-FROM python:3.7-alpine
+FROM python:3.7-alpine3.11
+
+ENV SPARK_VERSION=3.0.0
 
 RUN apk --update add make automake gcc g++ subversion \
     curl tar bash openjdk8 nss libc6-compat && \
     ln -s /lib64/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2
 
-RUN curl -L http://apache.spinellicreations.com/spark/spark-2.4.5/spark-2.4.5-bin-hadoop2.7.tgz -o spark-2.4.5-bin-hadoop2.7.tgz
+RUN curl -L http://apache.spinellicreations.com/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop2.7.tgz -o spark-${SPARK_VERSION}-bin-hadoop2.7.tgz
 
-RUN tar -xzf spark-2.4.5-bin-hadoop2.7.tgz && \
-    mv spark-2.4.5-bin-hadoop2.7 /spark && \
-    rm spark-2.4.5-bin-hadoop2.7.tgz && \
+RUN tar -xzf spark-${SPARK_VERSION}-bin-hadoop2.7.tgz && \
+    mv spark-${SPARK_VERSION}-bin-hadoop2.7 /spark && \
+    rm spark-${SPARK_VERSION}-bin-hadoop2.7.tgz && \
     pip3 install --upgrade pip && \
     pip3 install numpy pandas && \
     mkdir /etc/conf.d/hadoop
