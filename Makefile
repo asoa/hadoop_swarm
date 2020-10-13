@@ -1,20 +1,25 @@
-DOCKER_NETWORK = docker-hadoop_default
-ENV_FILE = hadoop.env
-current_branch := $(shell git rev-parse --abbrev-ref HEAD)
-build:
-	docker build -t bde2020/hadoop-base:$(current_branch) ./base
-	docker build -t bde2020/hadoop-namenode:$(current_branch) ./namenode
-	docker build -t bde2020/hadoop-datanode:$(current_branch) ./datanode
-	docker build -t bde2020/hadoop-resourcemanager:$(current_branch) ./resourcemanager
-	docker build -t bde2020/hadoop-nodemanager:$(current_branch) ./nodemanager
-	docker build -t bde2020/hadoop-historyserver:$(current_branch) ./historyserver
-	docker build -t bde2020/hadoop-submit:$(current_branch) ./submit
+.PHONY: build_hadoop build_spark push_images stack_up stack_down
 
-wordcount:
-	docker build -t hadoop-wordcount ./submit
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} bde2020/hadoop-base:$(current_branch) hdfs dfs -mkdir -p /input/
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} bde2020/hadoop-base:$(current_branch) hdfs dfs -copyFromLocal -f /opt/hadoop-3.2.1/README.txt /input/
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} hadoop-wordcount
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} bde2020/hadoop-base:$(current_branch) hdfs dfs -cat /output/*
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} bde2020/hadoop-base:$(current_branch) hdfs dfs -rm -r /output
-	docker run --network ${DOCKER_NETWORK} --env-file ${ENV_FILE} bde2020/hadoop-base:$(current_branch) hdfs dfs -rm -r /input
+build_hadoop:
+	@echo 'building hadoop containers'
+	docker-compose -f docker-compose.yml build namenode
+	docker-compose -f docker-compose.yml build datanode
+	docker-compose -f docker-compose.yml build resourcemanager
+	docker-compose -f docker-compose.yml build nodemanager
+	docker-compose -f docker-compose.yml build historyserver
+
+build_spark:
+	@echo 'building spark containers'
+	docker-compose -f spark/docker-compose.yml build spark-master
+	docker-compose -f spark/docker-compose.yml build spark-worker
+	docker-compose -f spark/docker-compose.yml build jupyter-lab
+
+push_images:
+	@echo 'pushing images to local repository'
+	./push_hadoop_services.sh
+
+stack_up:
+	./stack_up.sh
+
+stack_down:
+	./stack_down.sh	
